@@ -8,15 +8,52 @@ const TARGET = '0'.repeat(DIFFICULTY);
 // ─────────────────────────────────────────────────────────────
 // HASHING
 // ─────────────────────────────────────────────────────────────
+
+/**
+ * Calcula el hash asegurando que los tipos coincidan con PHP/Laravel.
+ * Se extraen los campos específicos para evitar que basura extra altere el hash.
+ */
 function calcularHash({ persona_id, institucion_id, titulo_obtenido, fecha_fin, hash_anterior, nonce }) {
-  const datos = `${persona_id}${institucion_id}${titulo_obtenido}${fecha_fin}${hash_anterior || ''}${nonce}`;
+  // TRUCO: Si la fecha trae horas (ej. 2025-06-01T00:00:00Z), cortamos para usar solo "YYYY-MM-DD"
+  const fechaCorta = fecha_fin ? fecha_fin.toString().substring(0, 10) : '';
+  
+  const datos = `${persona_id}${institucion_id}${titulo_obtenido}${fechaCorta}${hash_anterior || ''}${nonce}`;
+  
+  // 👇 LOG DETECTIVE: Imprimimos la cadena en Node para compararla con Laravel
+  logger.info(`🔍 [DEBUG NODE] Cadena hasheada: [${datos}]`);
+  
   return crypto.createHash('sha256').update(datos).digest('hex');
 }
+function calcularHash({ persona_id, institucion_id, titulo_obtenido, fecha_fin, hash_anterior, nonce }) {
+  // TRUCO: Si la fecha trae horas (ej. 2025-06-01T00:00:00Z), cortamos para usar solo "YYYY-MM-DD"
+  const fechaCorta = fecha_fin ? fecha_fin.toString().substring(0, 10) : '';
+  
+  const datos = `${persona_id}${institucion_id}${titulo_obtenido}${fechaCorta}${hash_anterior || ''}${nonce}`;
+  
+  // 👇 LOG DETECTIVE: Imprimimos la cadena en Node para compararla con Laravel
+  logger.info(`🔍 [DEBUG NODE] Cadena hasheada: [${datos}]`);
+  
+  return crypto.createHash('sha256').update(datos).digest('hex');
+}
+/*
+//function calcularHash(bloque) {
+  const p = bloque.persona_id || '';
+  const i = bloque.institucion_id || '';
+  const t = bloque.titulo_obtenido || '';
+  const f = bloque.fecha_fin || '';
+  const h = bloque.hash_anterior || '';
+  const n = bloque.nonce || 0;
+
+  // Concatenación idéntica a Laravel ($p . $i . $t . $f . $h . $n)
+  const datos = `${p}${i}${t}${f}${h}${n}`;
+  return crypto.createHash('sha256').update(datos).digest('hex');
+//} */
 
 function proofOfWork(datosBloque) {
   let nonce = 0;
   let hash = '';
-  logger.info(`⛏️ Iniciando PoW...`);
+  logger.info('⛏️ Iniciando PoW...');
+  
   while (!hash.startsWith(TARGET)) {
     nonce++;
     hash = calcularHash({ ...datosBloque, nonce });
@@ -27,9 +64,39 @@ function proofOfWork(datosBloque) {
 // ─────────────────────────────────────────────────────────────
 // VALIDACIÓN
 // ─────────────────────────────────────────────────────────────
-function validarBloque(bloque) {
-  const hashRecalculado = calcularHash(bloque);
-  return hashRecalculado === bloque.hash_actual && bloque.hash_actual.startsWith(TARGET);
+
+/**
+ * Valida un bloque extrayendo los datos ya sea de la raíz (Laravel)
+ * o de la llave 'data' (Node.js).
+ */
+function validarBloque(bloqueRecibido) {
+  if (!bloqueRecibido || !bloqueRecibido.hash_actual) return false;
+
+  // 1. Normalizar fuente de datos (Híbrido)
+  const fuente = (bloqueRecibido.data && bloqueRecibido.data.transacciones) 
+                 ? bloqueRecibido.data.transacciones[0] 
+                 : bloqueRecibido;
+
+  // 2. Preparar objeto para recalcular hash
+  const datosParaHash = {
+    persona_id: fuente.persona_id,
+    institucion_id: fuente.institucion_id,
+    titulo_obtenido: fuente.titulo_obtenido,
+    fecha_fin: fuente.fecha_fin,
+    hash_anterior: bloqueRecibido.hash_anterior,
+    nonce: bloqueRecibido.nonce
+  };
+
+  const hashRecalculado = calcularHash(datosParaHash);
+
+  const esValido = hashRecalculado === bloqueRecibido.hash_actual;
+  const cumpleDificultad = bloqueRecibido.hash_actual.startsWith(TARGET);
+
+  if (!esValido) {
+    logger.error(`❌ Hash inválido. Recibido: ${bloqueRecibido.hash_actual} | Calculado: ${hashRecalculado}`);
+  }
+
+  return esValido && cumpleDificultad;
 }
 
 function validarCadena(cadena) {
@@ -37,6 +104,7 @@ function validarCadena(cadena) {
   for (let i = 1; i < cadena.length; i++) {
     const bloqueActual = cadena[i];
     const bloqueAnterior = cadena[i - 1];
+    
     if (!validarBloque(bloqueActual)) return false;
     if (bloqueActual.hash_anterior !== bloqueAnterior.hash_actual) return false;
   }
@@ -46,6 +114,7 @@ function validarCadena(cadena) {
 // ─────────────────────────────────────────────────────────────
 // PERSISTENCIA (Supabase)
 // ─────────────────────────────────────────────────────────────
+
 async function obtenerCadenaLocal() {
   const { data, error } = await supabase
     .from('grados')
@@ -69,6 +138,7 @@ async function obtenerUltimoBloque() {
 }
 
 async function guardarBloque(bloque) {
+  // Limpieza de campos innecesarios antes de guardar en Supabase
   const { data, error } = await supabase.from('grados').insert(bloque).select().single();
   if (error) throw error;
   return data;
@@ -77,10 +147,11 @@ async function guardarBloque(bloque) {
 // ─────────────────────────────────────────────────────────────
 // INICIALIZACIÓN
 // ─────────────────────────────────────────────────────────────
+
 async function inicializarBlockchain() {
   const cadena = await obtenerCadenaLocal();
   if (cadena.length === 0) {
-    logger.info('Creando bloque génesis...');
+    logger.info('🌱 Creando bloque génesis...');
     const genesisData = {
       persona_id: null,
       institucion_id: null,
@@ -95,15 +166,16 @@ async function inicializarBlockchain() {
       nonce,
       firmado_por: 'Nodo 1' 
     });
-    logger.info(' Blockchain inicializada con bloque génesis');
+    logger.info('✅ Blockchain inicializada con bloque génesis');
   } else {
-    logger.info(` Blockchain cargada | ${cadena.length} bloques existentes`);
+    logger.info(`✅ Blockchain cargada | ${cadena.length} bloques existentes`);
   }
 }
 
 // ─────────────────────────────────────────────────────────────
 // MINADO
 // ─────────────────────────────────────────────────────────────
+
 async function minarBloque(transacciones) {
   if (!transacciones || transacciones.length === 0) throw new Error('No hay transacciones');
 
@@ -135,16 +207,14 @@ async function minarBloque(transacciones) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// CONSENSO (Fase 4)
+// CONSENSO
 // ─────────────────────────────────────────────────────────────
+
 async function reemplazarCadena(nuevaCadena) {
-  logger.info('Reemplazando cadena con soporte híbrido...');
+  logger.info('🔄 Reemplazando cadena con soporte híbrido...');
   
   try {
-    // 1. Mapear la cadena para que siempre tenga el formato que su base de datos espera
     const cadenaNormalizada = nuevaCadena.map(bloque => {
-      // Si el bloque viene de Laravel, los datos están en la raíz. 
-      // Si viene de Node, están en bloque.data.transacciones[0]
       const tx = (bloque.data && bloque.data.transacciones) ? bloque.data.transacciones[0] : bloque;
 
       return {
@@ -160,18 +230,17 @@ async function reemplazarCadena(nuevaCadena) {
         numero_cedula: tx.numero_cedula || null,
         titulo_tesis: tx.titulo_tesis || null,
         menciones: tx.menciones || null,
-        firmado_por: tx.firmado_por || bloque.firmado_por || 'Nodo '
+        firmado_por: tx.firmado_por || bloque.firmado_por || 'Nodo Externo'
       };
     });
 
-    // 2. Borrar actual (Truco del nonce para Supabase)
+    // Limpiar tabla (Filtro nonce >= 0 para bypass de seguridad de Supabase)
     await supabase.from('grados').delete().gte('nonce', 0);
 
-    // 3. Insertar la nueva cadena ya normalizada
     const { error } = await supabase.from('grados').insert(cadenaNormalizada);
-    
     if (error) throw error;
-    logger.info('Cadena sincronizada con éxito )');
+    
+    logger.info('Cadena sincronizada exitosamente');
     
   } catch (error) {
     logger.error('Error en el consenso de Node:', error);
@@ -180,8 +249,9 @@ async function reemplazarCadena(nuevaCadena) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// EXPORTACIÓN (¡Todas las funciones incluidas!)
+// EXPORTACIÓN
 // ─────────────────────────────────────────────────────────────
+
 module.exports = { 
   calcularHash, 
   proofOfWork, 
