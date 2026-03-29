@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blockchain Node Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #060a0f;
+      --bg2:       #0b1118;
+      --bg3:       #111c27;
+      --border:    #1a2e3f;
+      --green:     #00ff88;
+      --green-dim: #00c466;
+      --green-glow:#00ff8833;
+      --blue:      #00aaff;
+      --blue-dim:  #0077cc;
+      --amber:     #ffaa00;
+      --red:       #ff4466;
+      --text:      #ccd9e0;
+      --text-dim:  #5a7a8a;
+      --mono:      'Share Tech Mono', monospace;
+      --sans:      'Rajdhani', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,136,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,136,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,.08) 2px, rgba(0,0,0,.08) 4px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+    .shell {
+      position: relative;
+      z-index: 1;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 28px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 42px; height: 42px;
+      border: 2px solid var(--green);
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 18px;
+      color: var(--green);
+      box-shadow: 0 0 14px var(--green-glow);
+      animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 14px var(--green-glow); }
+      50%      { box-shadow: 0 0 28px var(--green-glow), 0 0 6px var(--green); }
+    }
+    .logo-text h1 {
+      font-size: 22px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; color: #fff;
+    }
+    .logo-text span { font-family: var(--mono); font-size: 11px; color: var(--text-dim); letter-spacing: 1px; }
+    .status-pill {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+      padding: 6px 14px; border: 1px solid var(--border); background: var(--bg3);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 6px var(--green);
+      animation: blink 2s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    .stats-bar {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 12px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 18px 20px; position: relative; transition: border-color .2s;
+    }
+    .stat-card:hover { border-color: var(--green-dim); }
+    .stat-card::after {
+      content: ''; position: absolute; bottom: 0; left: 0;
+      height: 2px; width: 0; background: var(--green); transition: width .4s;
+    }
+    .stat-card:hover::after { width: 100%; }
+    .stat-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+    .stat-value { font-family: var(--mono); font-size: 28px; color: var(--green); text-shadow: 0 0 12px var(--green-glow); }
+    .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .main-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; }
+    .panel { background: var(--bg2); border: 1px solid var(--border); }
+    .panel-header {
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg3);
+    }
+    .panel-title { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--green); }
+    .panel-body { padding: 20px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+    .field input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: var(--mono); font-size: 13px;
+      padding: 10px 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+    }
+    .field input:focus { border-color: var(--green-dim); box-shadow: 0 0 0 2px var(--green-glow); }
+    .btn {
+      width: 100%; padding: 12px 20px; font-family: var(--mono); font-size: 13px;
+      letter-spacing: 2px; text-transform: uppercase; cursor: pointer; border: none;
+      transition: all .2s; position: relative; overflow: hidden;
+    }
+    .btn::before {
+      content: ''; position: absolute; inset: 0;
+      background: rgba(255,255,255,.07); transform: translateX(-100%); transition: transform .3s;
+    }
+    .btn:hover::before { transform: translateX(0); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-green { background: var(--green); color: #000; font-weight: 700; }
+    .btn-green:hover:not(:disabled) { box-shadow: 0 0 20px var(--green-glow); }
+    .btn-mine {
+      background: transparent; color: var(--amber); border: 1px solid var(--amber);
+      font-size: 15px; padding: 16px;
+    }
+    .btn-mine:hover:not(:disabled) { background: rgba(255,170,0,.1); box-shadow: 0 0 20px rgba(255,170,0,.2); }
+    .btn-sm {
+      width: auto; padding: 6px 14px; font-size: 10px;
+      background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    }
+    .btn-sm:hover { color: var(--green); border-color: var(--green-dim); }
+    .mine-info { font-family: var(--mono); font-size: 12px; color: var(--text-dim); text-align: center; padding: 12px 0 16px; line-height: 1.7; }
+    .pending-badge {
+      display: inline-block; background: rgba(0,255,136,.12); color: var(--green);
+      border: 1px solid rgba(0,255,136,.3); padding: 2px 10px;
+      font-size: 11px; font-family: var(--mono);
+    }
+    #toast-area { position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: var(--bg3); border-left: 3px solid var(--green);
+      padding: 12px 18px; font-family: var(--mono); font-size: 12px;
+      min-width: 280px; animation: slideIn .3s ease; box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    }
+    .toast.error { border-color: var(--red); color: var(--red); }
+    .toast.warn  { border-color: var(--amber); color: var(--amber); }
+    @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .chain-container {
+      max-height: 620px; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .block-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-left: 3px solid var(--blue-dim); padding: 16px;
+      animation: fadeUp .3s ease; transition: border-color .2s;
+    }
+    .block-card:hover { border-color: var(--blue); border-left-color: var(--blue); }
+    .block-card.genesis { border-left-color: var(--amber); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .block-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .block-num { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--text-dim); }
+    .block-badge { font-family: var(--mono); font-size: 10px; padding: 3px 10px; background: rgba(255,170,0,.12); color: var(--amber); border: 1px solid rgba(255,170,0,.3); }
+    .block-field { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin-bottom: 6px; }
+    .block-key { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; }
+    .block-val { font-family: var(--mono); font-size: 12px; color: var(--text); word-break: break-all; }
+    .hash-val { color: var(--green-dim); font-size: 11px; }
+    .chain-connector { text-align: center; color: var(--text-dim); font-size: 18px; line-height: 1; margin: -4px 0; }
+    .empty-state { text-align: center; padding: 60px 20px; font-family: var(--mono); color: var(--text-dim); font-size: 13px; }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .loading-line { font-family: var(--mono); font-size: 12px; color: var(--text-dim); text-align: center; padding: 40px; }
+    .loading-line::after { content: '...'; animation: dots 1.2s steps(4) infinite; }
+    @keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } 100% { content: ''; } }
+    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } .stats-bar { grid-template-columns: repeat(2,1fr); } }
+  </style>
+</head>
+<body>
+
+<div id="toast-area"></div>
+
+<div class="shell">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬡</div>
+      <div class="logo-text">
+        <h1>Blockchain Node</h1>
+        <span id="nodeLabel">NODE_ID: cargando...</span>
+      </div>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span id="statusText">CONECTANDO...</span>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Bloques</div>
+      <div class="stat-value" id="statBloques">—</div>
+      <div class="stat-sub">en la cadena local</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pendientes</div>
+      <div class="stat-value" id="statPendientes">—</div>
+      <div class="stat-sub">en la mempool</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Nodos</div>
+      <div class="stat-value" id="statNodos">—</div>
+      <div class="stat-sub">registrados</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Puerto</div>
+      <div class="stat-value" id="statPuerto">—</div>
+      <div class="stat-sub">este nodo</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">// nueva transacción</span>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label>ID Persona (UUID)</label>
+            <input type="text" id="persona_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          </div>
+          <div class="field">
+            <label>ID Institución (UUID)</label>
+            <input type="text" id="institucion_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          </div>
+          <div class="field">
+            <label>Título Obtenido</label>
+            <input type="text" id="titulo" placeholder="Ej. Ingeniero en Sistemas" />
+          </div>
+          <div class="field">
+            <label>Fecha de Fin</label>
+            <input type="date" id="fecha_fin" />
+          </div>
+          <button class="btn btn-green" id="btnTx">ENVIAR A MEMPOOL</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">// minado</span>
+          <span class="pending-badge" id="pendingCount">0 TX</span>
+        </div>
+        <div class="panel-body">
+          <p class="mine-info">
+            Empaqueta las transacciones pendientes<br>
+            resolviendo el <strong style="color:var(--amber)">Proof of Work</strong>.
+          </p>
+          <button class="btn btn-mine" id="btnMine">⛏ MINAR BLOQUE</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">// registrar nodo</span>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label>URL del nodo</label>
+            <input type="text" id="nodeUrl" placeholder="http://localhost:8001" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <button class="btn btn-green" id="btnRegister">REGISTRAR</button>
+            <button class="btn btn-sm" style="width:100%;" id="btnResolve">⚖ CONSENSO</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel" style="min-height:300px;">
+      <div class="panel-header">
+        <span class="panel-title">// historial de bloques</span>
+        <button class="btn btn-sm" id="btnRefresh">↻ REFRESCAR</button>
+      </div>
+      <div class="chain-container" id="chainContainer">
+        <div class="loading-line">Cargando cadena</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Al dejar esto vacío, el navegador asume automáticamente el puerto y host actual (ej. localhost:8001)
+  const API_URL = ''; 
+
+  function toast(msg, type = 'ok') {
+    const el = document.createElement('div');
+    el.className = `toast ${type === 'error' ? 'error' : type === 'warn' ? 'warn' : ''}`;
+    el.textContent = msg;
+    document.getElementById('toast-area').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  async function loadStats() {
+    try {
+      const [healthRes, pendRes, nodesRes] = await Promise.allSettled([
+        fetch(`${API_URL}/health`),
+        fetch(`${API_URL}/transactions/pending`),
+        fetch(`${API_URL}/nodes`),
+      ]);
+      
+      if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
+        const h = await healthRes.value.json();
+        document.getElementById('nodeLabel').textContent = `NODE_ID: ${h.node_id}`;
+        document.getElementById('statusText').textContent = `ONLINE — ${h.node_id}`;
+        // Obtiene el puerto dinámicamente
+        document.getElementById('statPuerto').textContent = h.port || window.location.port || '80';
+      }
+      
+      if (pendRes.status === 'fulfilled' && pendRes.value.ok) {
+        const p = await pendRes.value.json();
+        const count = p.total ?? p.pendientes?.length ?? 0;
+        document.getElementById('statPendientes').textContent = count;
+        document.getElementById('pendingCount').textContent = `${count} TX`;
+      }
+      
+      if (nodesRes.status === 'fulfilled' && nodesRes.value.ok) {
+        const n = await nodesRes.value.json();
+        // El backend devuelve { nodos: [...] }
+        const count = n.nodos ? n.nodos.length : 0;
+        document.getElementById('statNodos').textContent = count;
+      }
+    } catch (_) {}
+  }
+
+  async function loadChain() {
+    const container = document.getElementById('chainContainer');
+    container.innerHTML = '<div class="loading-line">Cargando cadena</div>';
+    try {
+      const res = await fetch(`${API_URL}/chain`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      
+      // ¡AQUÍ ESTÁ EL CAMBIO! Ahora lee data.cadena en lugar de data.chain
+      const chain = data.cadena || []; 
+      
+      document.getElementById('statBloques').textContent = data.longitud || chain.length;
+      
+      if (chain.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">⬡</div>La cadena está vacía.<br>Envía una transacción y mina el primer bloque.</div>`;
+        return;
+      }
+      
+      container.innerHTML = '';
+      chain.forEach((block, i) => {
+        const isGenesis = i === 0;
+        const card = document.createElement('div');
+        card.className = `block-card${isGenesis ? ' genesis' : ''}`;
+        card.innerHTML = `
+          <div class="block-header">
+            <span class="block-num">BLOQUE #${i}</span>
+            ${isGenesis ? '<span class="block-badge">GÉNESIS</span>' : ''}
+          </div>
+          <div class="block-field"><span class="block-key">hash_actual</span><span class="block-val hash-val">${trunc(block.hash_actual,48)}</span></div>
+          <div class="block-field"><span class="block-key">hash_anterior</span><span class="block-val hash-val">${trunc(block.hash_anterior||'0',48)}</span></div>
+          <div class="block-field"><span class="block-key">nonce</span><span class="block-val">${block.nonce}</span></div>
+          <div class="block-field"><span class="block-key">título</span><span class="block-val">${block.titulo_obtenido||'—'}</span></div>
+          <div class="block-field"><span class="block-key">firmado_por</span><span class="block-val">${block.firmado_por||'—'}</span></div>
+          <div class="block-field"><span class="block-key">fecha</span><span class="block-val">${block.creado_en ? new Date(block.creado_en).toLocaleString('es-MX') : '—'}</span></div>
+        `;
+        container.appendChild(card);
+        if (i < chain.length - 1) {
+          const conn = document.createElement('div');
+          conn.className = 'chain-connector';
+          conn.textContent = '↑';
+          container.appendChild(conn);
+        }
+      });
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">⚠</div>Error al conectar con el nodo.<br><span style="font-size:11px;color:var(--text-dim)">¿El servidor Express está encendido?</span></div>`;
+      document.getElementById('statusText').textContent = 'OFFLINE';
+      document.querySelector('.status-dot').style.background = 'var(--red)';
+    }
+  }
+
+  function trunc(str, n) {
+    if (!str) return '—';
+    return str.length > n ? str.slice(0, n) + '…' : str;
+  }
+
+  document.getElementById('btnTx').addEventListener('click', async () => {
+    const persona_id = document.getElementById('persona_id').value.trim();
+    const institucion_id = document.getElementById('institucion_id').value.trim();
+    const titulo_obtenido = document.getElementById('titulo').value.trim();
+    const fecha_fin = document.getElementById('fecha_fin').value;
+    if (!persona_id || !institucion_id || !titulo_obtenido || !fecha_fin) { toast('Completa todos los campos', 'warn'); return; }
+    try {
+      const res = await fetch(`${API_URL}/transactions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona_id, institucion_id, titulo_obtenido, fecha_fin }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast('✓ Transacción enviada a la mempool');
+      
+      // Limpiar el formulario después de enviar
+      document.getElementById('titulo').value = ''; 
+      loadStats();
+    } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  });
+
+  document.getElementById('btnMine').addEventListener('click', async () => {
+    const btn = document.getElementById('btnMine');
+    btn.disabled = true; btn.textContent = '⏳ CALCULANDO POW...';
+    try {
+      const res = await fetch(`${API_URL}/mine`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast('⛏ Bloque minado exitosamente');
+      loadChain(); loadStats();
+    } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+    finally { btn.disabled = false; btn.textContent = '⛏ MINAR BLOQUE'; }
+  });
+
+  document.getElementById('btnRegister').addEventListener('click', async () => {
+    const url = document.getElementById('nodeUrl').value.trim();
+    if (!url) { toast('Ingresa la URL del nodo', 'warn'); return; }
+    try {
+      const res = await fetch(`${API_URL}/nodes/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        // ¡AQUÍ ESTÁ EL CAMBIO! Formato exacto que pidió tu equipo
+        body: JSON.stringify({ url: url, nombre: "Nodo_Visual_UI" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast(`✓ Nodo registrado exitosamente`);
+      document.getElementById('nodeUrl').value = '';
+      loadStats();
+    } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  });
+
+  document.getElementById('btnResolve').addEventListener('click', async () => {
+    try {
+      const res = await fetch(`${API_URL}/nodes/resolve`);
+      const data = await res.json();
+      // ¡AQUÍ ESTÁ EL CAMBIO! Imprime directamente el mensaje del backend
+      toast(data.mensaje || 'Algoritmo de consenso ejecutado');
+      loadChain(); loadStats();
+    } catch (e) { toast(`Error en consenso: ${e.message}`, 'error'); }
+  });
+
+  document.getElementById('btnRefresh').addEventListener('click', () => { loadChain(); loadStats(); });
+
+  loadStats();
+  loadChain();
+  // Se actualiza solo cada 10 segundos para ver si hay bloques nuevos
+  setInterval(() => { loadStats(); loadChain(); }, 10000); 
+</script>
+</body>
+</html>
