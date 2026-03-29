@@ -1,32 +1,30 @@
-// Archivo: src/routes/blocks.js
 const express = require('express');
 const router = express.Router();
 const blockchain = require('../services/blockchain');
-const logger = require('../config/logger');
+const mempool = require('../services/mempool'); // Importamos mempool para limpiar
 
-/**
- * @openapi
- * /blocks/receive:
- * post:
- * summary: Recibe un bloque minado por otro nodo de la red
- * tags: [Red P2P]
- */
 router.post('/receive', async (req, res) => {
+  // Acepta { bloque: {...} } o {...}
   const bloqueRecibido = req.body.bloque || req.body; 
 
   try {
-    logger.info(`Bloque recibido de la red | hash: ${bloqueRecibido.hash_actual}`);
-    
-    const aceptado = await blockchain.agregarBloqueExterno(bloqueRecibido);
-
-    if (aceptado) {
-      res.status(200).json({ mensaje: 'Bloque verificado y agregado a la cadena local' });
-    } else {
-      res.status(400).json({ error: 'Bloque rechazado (hash inválido o cadena desactualizada)' });
+    // 1. Validar técnicamente
+    if (!blockchain.validarBloque(bloqueRecibido)) {
+        return res.status(400).json({ error: 'Hash o PoW inválido' });
     }
+
+    // 2. Guardar en DB
+    const resultado = await blockchain.aceptarBloqueExterno(bloqueRecibido);
+
+    // 3. ✨ LIMPIAR MEMPOOL: Si el bloque llegó, la transacción ya no es pendiente
+    const pendientes = mempool.obtenerTransacciones();
+    const filtradas = pendientes.filter(tx => tx.persona_id !== bloqueRecibido.persona_id);
+    mempool.limpiarTransacciones();
+    filtradas.forEach(tx => mempool.agregarTransaccion(tx));
+
+    res.status(200).json({ mensaje: 'Bloque aceptado y mempool actualizado' });
   } catch (err) {
-    logger.error('Error al procesar bloque externo', { error: err.message });
-    res.status(500).json({ error: 'Error interno al procesar el bloque' });
+    res.status(400).json({ error: err.message });
   }
 });
 

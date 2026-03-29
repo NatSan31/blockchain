@@ -352,7 +352,8 @@
         const h = await healthRes.value.json();
         document.getElementById('nodeLabel').textContent = `NODE_ID: ${h.node_id}`;
         document.getElementById('statusText').textContent = `ONLINE — ${h.node_id}`;
-        // Obtiene el puerto dinámicamente
+        document.querySelector('.status-dot').style.background = 'var(--green)';
+        
         document.getElementById('statPuerto').textContent = h.port || window.location.port || '80';
       }
       
@@ -380,7 +381,7 @@
       if (!res.ok) throw new Error();
       const data = await res.json();
       
-      // ¡AQUÍ ESTÁ EL CAMBIO! Ahora lee data.cadena en lugar de data.chain
+      
       const chain = data.cadena || []; 
       
       document.getElementById('statBloques').textContent = data.longitud || chain.length;
@@ -466,7 +467,7 @@
     try {
       const res = await fetch(`${API_URL}/nodes/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        // ¡AQUÍ ESTÁ EL CAMBIO! Formato exacto que pidió tu equipo
+        
         body: JSON.stringify({ url: url, nombre: "Nodo_Visual_UI" }),
       });
       const data = await res.json();
@@ -481,7 +482,7 @@
     try {
       const res = await fetch(`${API_URL}/nodes/resolve`);
       const data = await res.json();
-      // ¡AQUÍ ESTÁ EL CAMBIO! Imprime directamente el mensaje del backend
+      
       toast(data.mensaje || 'Algoritmo de consenso ejecutado');
       loadChain(); loadStats();
     } catch (e) { toast(`Error en consenso: ${e.message}`, 'error'); }
@@ -491,8 +492,8 @@
 
   loadStats();
   loadChain();
-  // Se actualiza solo cada 10 segundos para ver si hay bloques nuevos
-  setInterval(() => { loadStats(); loadChain(); }, 10000); 
+  
+  setInterval(() => { loadStats(); loadChain(); }, 20000); 
 </script>
 </body>
 </html>

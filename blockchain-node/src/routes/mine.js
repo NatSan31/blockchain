@@ -18,36 +18,35 @@ const logger = require('../config/logger');
  * description: No hay transacciones pendientes
  */
 router.post('/', async (req, res) => {
-  // 1. Obtener las transacciones pendientes
-  const transacciones = mempool.obtenerTransacciones();
-
-  // 2. Validar que haya algo que minar
-  if (transacciones.length === 0) {
-    return res.status(400).json({ error: 'No hay transacciones pendientes para minar' });
-  }
-
   try {
-    // 3. Minar el nuevo bloque con esas transacciones
+    const transacciones = mempool.obtenerTransacciones();
+
+    if (transacciones.length === 0) {
+      return res.status(400).json({ error: 'No hay transacciones pendientes para minar' });
+    }
+
     const nuevoBloque = await blockchain.minarBloque(transacciones);
 
-    // 4. Limpiar la mempool porque las transacciones ya están en el bloque
+    // Asegúrate de que este nombre coincida con tu mempool.js
     mempool.limpiarTransacciones();
 
-    // 5. Avisarle a los demás nodos sobre el nuevo bloque (Propagación)
-    nodes.propagarBloque(nuevoBloque);
+    // Propagación a otros nodos
+    if (nodes && typeof nodes.propagarBloque === 'function') {
+      nodes.propagarBloque(nuevoBloque);
+    }
 
-    logger.info(`Bloque #${nuevoBloque.indice || nuevoBloque.id || 'minado'} creado exitosamente`);
+    logger.info(`✅ Bloque minado exitosamente por Nodo 4`);
 
-    // 6. Responder al frontend
     res.status(200).json({
       mensaje: 'Bloque minado y propagado exitosamente',
       bloque: nuevoBloque
     });
 
   } catch (error) {
-    logger.error('Error al minar bloque', { error: error.message });
-    res.status(500).json({ error: 'Error interno al minar el bloque' });
+    logger.error('💥 Error al minar bloque:', { error: error.message });
+    res.status(500).json({ error: 'Error interno al minar el bloque', detalle: error.message });
   }
 });
 
+// ESTA LÍNEA ES LA MÁS IMPORTANTE PARA QUITAR EL ERROR DE "Router.use()"
 module.exports = router;
