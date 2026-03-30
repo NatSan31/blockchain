@@ -273,6 +273,10 @@
             <input type="text" id="institucion_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           </div>
           <div class="field">
+            <label>ID Programa (UUID)</label>
+            <input type="text" id="programa_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          </div>
+          <div class="field">
             <label>Título Obtenido</label>
             <input type="text" id="titulo" placeholder="Ej. Ingeniero en Sistemas" />
           </div>
@@ -431,19 +435,28 @@
   document.getElementById('btnTx').addEventListener('click', async () => {
     const persona_id = document.getElementById('persona_id').value.trim();
     const institucion_id = document.getElementById('institucion_id').value.trim();
+    
+    // 👇 NUEVA VARIABLE AÑADIDA: PROGRAMA_ID
+    const programa_id = document.getElementById('programa_id').value.trim();
+    
     const titulo_obtenido = document.getElementById('titulo').value.trim();
     const fecha_fin = document.getElementById('fecha_fin').value;
-    if (!persona_id || !institucion_id || !titulo_obtenido || !fecha_fin) { toast('Completa todos los campos', 'warn'); return; }
+    
+    // 👇 VALIDACIÓN ACTUALIZADA
+    if (!persona_id || !institucion_id || !programa_id || !titulo_obtenido || !fecha_fin) { toast('Completa todos los campos', 'warn'); return; }
     try {
       const res = await fetch(`${API_URL}/transactions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ persona_id, institucion_id, titulo_obtenido, fecha_fin }),
+        
+        // 👇 JSON ACTUALIZADO PARA INCLUIR programa_id
+        body: JSON.stringify({ persona_id, institucion_id, programa_id, titulo_obtenido, fecha_fin }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast('✓ Transacción enviada a la mempool');
       
-      // Limpiar el formulario después de enviar
+      // Limpiar los campos de texto
       document.getElementById('titulo').value = ''; 
+      document.getElementById('programa_id').value = ''; 
       loadStats();
     } catch (e) { toast(`Error: ${e.message}`, 'error'); }
   });
